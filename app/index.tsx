@@ -1,15 +1,17 @@
-import { View, Text, StyleSheet, ImageBackground, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Onboarding1() {
   const router = useRouter();
 
   return (
     <ImageBackground 
-      source={{ uri: 'https://images.unsplash.com/photo-1577983072965-0219c6298e3b?q=80&w=1000&auto=format&fit=crop' }} 
+      source={require('../assets/train-hero.png')}
       style={styles.background}
     >
+      <View style={styles.overlay} />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.topContainer}>
           <TouchableOpacity onPress={() => router.replace('/login')} style={styles.skipButton}>
@@ -18,10 +20,8 @@ export default function Onboarding1() {
           </TouchableOpacity>
         </View>
 
-        {/* Carousel indicators (mock) */}
         <View style={styles.indicatorContainer}>
           <View style={[styles.indicator, styles.indicatorActive]} />
-          <View style={styles.indicator} />
           <View style={styles.indicator} />
         </View>
 
@@ -47,7 +47,10 @@ export default function Onboarding1() {
 const styles = StyleSheet.create({
   background: {
     flex: 1,
-    resizeMode: 'cover',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(2, 18, 43, 0.2)',
   },
   safeArea: {
     flex: 1,
@@ -60,6 +63,8 @@ const styles = StyleSheet.create({
   skipButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 44,
+    paddingHorizontal: 8,
   },
   skipText: {
     color: 'white',

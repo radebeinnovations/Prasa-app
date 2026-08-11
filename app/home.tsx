@@ -1,80 +1,82 @@
-import { View, Text, StyleSheet, ImageBackground, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import {
+  ImageBackground,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+type HomeRoute = '/trains' | '/tickets' | '/schedule' | '/parcels' | '/stations' | '/notifications';
+
+const actions: { icon: keyof typeof Ionicons.glyphMap; label: string; route: HomeRoute }[] = [
+  { icon: 'train', label: 'Trains', route: '/trains' },
+  { icon: 'ticket', label: 'Tickets', route: '/tickets' },
+  { icon: 'calendar', label: 'Schedule', route: '/schedule' },
+  { icon: 'cube', label: 'Parcels', route: '/parcels' },
+  { icon: 'business', label: 'Stations', route: '/stations' },
+  { icon: 'notifications', label: 'Notifications', route: '/notifications' },
+];
 
 export default function Home() {
   const router = useRouter();
-  
+  const params = useLocalSearchParams<{ name?: string | string[] }>();
+  const rawName = Array.isArray(params.name) ? params.name[0] : params.name;
+  const displayName = rawName?.trim() || 'Commuter';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+
   return (
     <View style={styles.container}>
-      {/* Top half with train background */}
-      <ImageBackground 
-        source={{ uri: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?q=80&w=1000&auto=format&fit=crop' }} 
-        style={styles.headerBackground}
-      >
-        <SafeAreaView style={styles.safeArea}>
+      <ImageBackground source={require('../assets/train-hero.png')} style={styles.headerBackground}>
+        <View style={styles.overlay} />
+        <SafeAreaView edges={['top']} style={styles.safeArea}>
           <View style={styles.topBar}>
-            <TouchableOpacity onPress={() => router.push('/menu')}>
-              <Ionicons name="menu" size={32} color="#0076CB" />
+            <TouchableOpacity
+              accessibilityLabel="Open menu"
+              accessibilityRole="button"
+              onPress={() => router.push('/menu')}
+              style={styles.headerButton}
+            >
+              <Ionicons name="menu" size={30} color="#FFFFFF" />
             </TouchableOpacity>
-            <TouchableOpacity>
-              <Ionicons name="search" size={28} color="#0076CB" />
+            <TouchableOpacity
+              accessibilityLabel="Search stations"
+              accessibilityRole="button"
+              onPress={() => router.push('/stations')}
+              style={styles.headerButton}
+            >
+              <Ionicons name="search" size={25} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.greetingContainer}>
-            <Text style={styles.greetingText}>Good Morning !</Text>
-            <Text style={styles.nameText}>Smith</Text>
+            <Text style={styles.greetingText}>{greeting},</Text>
+            <Text numberOfLines={1} style={styles.nameText}>{displayName}</Text>
           </View>
         </SafeAreaView>
       </ImageBackground>
 
-      {/* Bottom half with grid */}
       <View style={styles.bottomSheet}>
-        <ScrollView contentContainerStyle={styles.gridContainer}>
-          
-          <TouchableOpacity style={styles.gridItem} onPress={() => router.push('/trains')}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="train" size={30} color="#0076CB" />
-            </View>
-            <Text style={styles.iconLabel}>Trains</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gridItem} onPress={() => router.push('/tickets')}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="ticket" size={30} color="#0076CB" />
-            </View>
-            <Text style={styles.iconLabel}>Tickets</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gridItem} onPress={() => router.push('/schedule')}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="calendar" size={30} color="#0076CB" />
-            </View>
-            <Text style={styles.iconLabel}>Schedule</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gridItem} onPress={() => router.push('/parcels')}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="cube" size={30} color="#0076CB" />
-            </View>
-            <Text style={styles.iconLabel}>Parcels</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gridItem}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="business" size={30} color="#0076CB" />
-            </View>
-            <Text style={styles.iconLabel}>Stations</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gridItem} onPress={() => router.push('/notifications')}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="notifications" size={30} color="#0076CB" />
-            </View>
-            <Text style={styles.iconLabel}>Notifications</Text>
-          </TouchableOpacity>
-
+        <Text style={styles.sectionTitle}>What would you like to do?</Text>
+        <ScrollView contentContainerStyle={styles.gridContainer} showsVerticalScrollIndicator={false}>
+          {actions.map((action) => (
+            <TouchableOpacity
+              accessibilityLabel={action.label}
+              accessibilityRole="button"
+              key={action.route}
+              onPress={() => router.push(action.route)}
+              style={styles.gridItem}
+            >
+              <View style={styles.iconCircle}>
+                <Ionicons name={action.icon} size={30} color="#0076CB" />
+              </View>
+              <Text style={styles.iconLabel}>{action.label}</Text>
+            </TouchableOpacity>
+          ))}
         </ScrollView>
       </View>
     </View>
@@ -82,68 +84,42 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  headerBackground: { height: '55%', width: '100%' },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(2, 18, 43, 0.34)' },
+  safeArea: { flex: 1 },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8 },
+  headerButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(2, 18, 43, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  headerBackground: {
-    height: '55%',
-    width: '100%',
-    resizeMode: 'cover',
-  },
-  safeArea: {
-    flex: 1,
-  },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  greetingContainer: {
-    paddingHorizontal: 20,
-    marginTop: 20,
-  },
-  greetingText: {
-    fontSize: 22,
-    color: '#4A4A4A',
-  },
-  nameText: {
-    fontSize: 22,
-    color: '#4A4A4A',
-    fontWeight: 'bold',
-  },
+  greetingContainer: { paddingHorizontal: 24, marginTop: 24 },
+  greetingText: { fontSize: 22, color: '#FFFFFF', textShadowColor: '#000', textShadowRadius: 5 },
+  nameText: { fontSize: 30, color: '#FFFFFF', fontWeight: '800', textShadowColor: '#000', textShadowRadius: 5 },
   bottomSheet: {
     flex: 1,
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    marginTop: -30, // Overlap the background
-    paddingTop: 30,
+    marginTop: -30,
+    paddingTop: 28,
     paddingHorizontal: 20,
   },
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingBottom: 20,
-  },
-  gridItem: {
-    width: '30%',
-    alignItems: 'center',
-    marginBottom: 30,
-  },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 20 },
+  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingBottom: 24 },
+  gridItem: { width: '30%', alignItems: 'center', marginBottom: 28 },
   iconCircle: {
     width: 70,
     height: 70,
-    borderRadius: 35,
-    backgroundColor: '#F1F1F1',
+    borderRadius: 24,
+    backgroundColor: '#EFF6FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
   },
-  iconLabel: {
-    fontSize: 14,
-    color: '#000000',
-  }
+  iconLabel: { fontSize: 14, color: '#1E293B', textAlign: 'center' },
 });

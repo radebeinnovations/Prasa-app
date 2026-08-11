@@ -1,99 +1,94 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const ticketOptions = [
+  { id: 'morning', start: '07:30', end: '08:00', duration: 30, price: 40 },
+  { id: 'midmorning', start: '09:14', end: '09:41', duration: 27, price: 20 },
+  { id: 'midday', start: '11:20', end: '12:01', duration: 41, price: 35 },
+];
 
 export default function Tickets() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ from?: string | string[]; to?: string | string[]; date?: string | string[] }>();
+  const valueOf = (value: string | string[] | undefined, fallback: string) => Array.isArray(value) ? value[0] || fallback : value || fallback;
+  const from = valueOf(params.from, 'Pretoria');
+  const to = valueOf(params.to, 'Park Station');
+  const date = valueOf(params.date, new Date().toLocaleDateString('en-ZA'));
+  const [sortByPrice, setSortByPrice] = useState(false);
+  const options = useMemo(
+    () => [...ticketOptions].sort((a, b) => sortByPrice ? a.price - b.price : a.start.localeCompare(b.start)),
+    [sortByPrice],
+  );
+
+  const buyTicket = (start: string, price: number) => {
+    Alert.alert('Confirm demo ticket', `${from} to ${to}\n${date} at ${start}\nR${price.toFixed(2)}`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Confirm', onPress: () => Alert.alert('Ticket reserved', 'Your demo ticket has been added successfully.') },
+    ]);
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <SafeAreaView edges={['top', 'bottom']} style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity accessibilityLabel="Go back" accessibilityRole="button" onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#0076CB" />
           <Text style={styles.headerTitle}>Tickets</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Top Form */}
-      <View style={styles.formContainer}>
-        <View style={styles.row}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>From:</Text>
-            <View style={styles.inputBox}>
-              <Text style={styles.inputText}>Pretoria</Text>
-            </View>
+      <View style={styles.tripCard}>
+        <View style={styles.tripRow}>
+          <View style={styles.tripPoint}>
+            <Text style={styles.label}>FROM</Text>
+            <Text numberOfLines={1} style={styles.inputText}>{from}</Text>
           </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>To:</Text>
-            <View style={styles.inputBox}>
-              <Text style={styles.inputText}>Johannesburg</Text>
-            </View>
+          <Ionicons name="arrow-forward" size={20} color="#0076CB" />
+          <View style={[styles.tripPoint, styles.tripPointRight]}>
+            <Text style={styles.label}>TO</Text>
+            <Text numberOfLines={1} style={styles.inputText}>{to}</Text>
           </View>
         </View>
-
-        <View style={styles.dateGroup}>
-          <Text style={styles.label}>Date:</Text>
-          <View style={styles.dateBox}>
-            <Ionicons name="calendar-outline" size={24} color="#000" style={styles.calendarIcon} />
-            <Text style={styles.inputText}>08/ 09/ 2025</Text>
-          </View>
+        <View style={styles.dateRow}>
+          <Ionicons name="calendar-outline" size={20} color="#0076CB" />
+          <Text style={styles.dateText}>{date}</Text>
         </View>
       </View>
 
-      {/* Bottom Sheet */}
       <View style={styles.bottomSheet}>
-        <View style={styles.sheetHandle} />
-        
         <View style={styles.sheetHeader}>
-          <TouchableOpacity>
-            <Ionicons name="options-outline" size={28} color="#0076CB" />
+          <View>
+            <Text style={styles.resultsTitle}>Available trains</Text>
+            <Text style={styles.resultsSubtitle}>{options.length} demo options</Text>
+          </View>
+          <TouchableOpacity
+            accessibilityLabel={sortByPrice ? 'Sort by departure time' : 'Sort by lowest price'}
+            accessibilityRole="button"
+            onPress={() => setSortByPrice((current) => !current)}
+            style={[styles.filterButton, sortByPrice && styles.filterButtonActive]}
+          >
+            <Ionicons name="options-outline" size={22} color={sortByPrice ? '#FFFFFF' : '#0076CB'} />
+            <Text style={[styles.filterText, sortByPrice && styles.filterTextActive]}>{sortByPrice ? 'Price' : 'Time'}</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.ticketList}>
-          {/* Ticket Item 1 */}
-          <View style={styles.ticketItem}>
-            <View style={styles.timeInfo}>
-              <Text style={styles.timeText}>7:30am <Text style={styles.timeDash}>-</Text> 8:00am</Text>
-              <View style={styles.durationContainer}>
-                <Ionicons name="time-outline" size={16} color="#0076CB" />
-                <Text style={styles.durationText}>30 min</Text>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {options.map((ticket) => (
+            <View key={ticket.id} style={styles.ticketItem}>
+              <View style={styles.timeInfo}>
+                <Text style={styles.timeText}>{ticket.start} <Text style={styles.timeDash}>→</Text> {ticket.end}</Text>
+                <View style={styles.durationContainer}>
+                  <Ionicons name="time-outline" size={16} color="#0076CB" />
+                  <Text style={styles.durationText}>{ticket.duration} min · direct</Text>
+                </View>
               </View>
+              <TouchableOpacity accessibilityLabel={`Buy ticket for R${ticket.price}`} accessibilityRole="button" onPress={() => buyTicket(ticket.start, ticket.price)} style={styles.priceButton}>
+                <Text style={styles.priceText}>R{ticket.price.toFixed(2)}</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.priceButton}>
-              <Text style={styles.priceText}>R40.00</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Ticket Item 2 */}
-          <View style={styles.ticketItem}>
-            <View style={styles.timeInfo}>
-              <Text style={styles.timeText}>9:14am <Text style={styles.timeDash}>-</Text> 9:41am</Text>
-              <View style={styles.durationContainer}>
-                <Ionicons name="time-outline" size={16} color="#0076CB" />
-                <Text style={styles.durationText}>27 min</Text>
-              </View>
-            </View>
-            <TouchableOpacity style={styles.priceButton}>
-              <Text style={styles.priceText}>R20.00</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Ticket Item 3 */}
-          <View style={styles.ticketItem}>
-            <View style={styles.timeInfo}>
-              <Text style={styles.timeText}>11:20am <Text style={styles.timeDash}>-</Text> 12:01pm</Text>
-              <View style={styles.durationContainer}>
-                <Ionicons name="time-outline" size={16} color="#0076CB" />
-                <Text style={styles.durationText}>41 min</Text>
-              </View>
-            </View>
-            <TouchableOpacity style={styles.priceButton}>
-              <Text style={styles.priceText}>R35.00</Text>
-            </TouchableOpacity>
-          </View>
+          ))}
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -101,128 +96,32 @@ export default function Tickets() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  header: {
-    padding: 20,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    color: '#0076CB',
-    fontWeight: '500',
-    marginLeft: 5,
-  },
-  formContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  inputGroup: {
-    width: '47%',
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#000',
-  },
-  inputBox: {
-    backgroundColor: '#F1F1F1',
-    padding: 15,
-    borderRadius: 8,
-  },
-  inputText: {
-    fontSize: 16,
-    color: '#4A4A4A',
-  },
-  dateGroup: {
-    marginBottom: 20,
-  },
-  dateBox: {
-    backgroundColor: '#F1F1F1',
-    padding: 15,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  calendarIcon: {
-    marginRight: 15,
-  },
-  bottomSheet: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    paddingTop: 15,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 10,
-  },
-  sheetHeader: {
-    alignItems: 'flex-end',
-    marginBottom: 10,
-  },
-  ticketList: {
-    flex: 1,
-  },
-  ticketItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F1F1',
-  },
-  timeInfo: {
-    flex: 1,
-  },
-  timeText: {
-    fontSize: 18,
-    color: '#000',
-    marginBottom: 5,
-  },
-  timeDash: {
-    color: '#E0E0E0',
-  },
-  durationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  durationText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 5,
-  },
-  priceButton: {
-    backgroundColor: '#0076CB',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  priceText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  header: { paddingHorizontal: 20, paddingVertical: 12 },
+  backButton: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
+  headerTitle: { fontSize: 20, color: '#0076CB', fontWeight: '700', marginLeft: 5 },
+  tripCard: { marginHorizontal: 20, marginBottom: 20, backgroundColor: '#FFFFFF', padding: 18, borderRadius: 16 },
+  tripRow: { flexDirection: 'row', alignItems: 'center' },
+  tripPoint: { flex: 1 },
+  tripPointRight: { alignItems: 'flex-end' },
+  label: { fontSize: 10, fontWeight: '800', letterSpacing: 1, color: '#64748B', marginBottom: 5 },
+  inputText: { fontSize: 16, fontWeight: '700', color: '#1E293B', maxWidth: '92%' },
+  dateRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#CBD5E1', paddingTop: 14, marginTop: 16 },
+  dateText: { fontSize: 14, color: '#475569', marginLeft: 8 },
+  bottomSheet: { flex: 1, backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 22 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  resultsTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
+  resultsSubtitle: { color: '#64748B', fontSize: 12, marginTop: 2 },
+  filterButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, minHeight: 42, borderRadius: 12, backgroundColor: '#EFF6FF' },
+  filterButtonActive: { backgroundColor: '#0076CB' },
+  filterText: { color: '#0076CB', fontSize: 13, fontWeight: '700' },
+  filterTextActive: { color: '#FFFFFF' },
+  ticketItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 20, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E2E8F0' },
+  timeInfo: { flex: 1 },
+  timeText: { fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 7 },
+  timeDash: { color: '#0076CB' },
+  durationContainer: { flexDirection: 'row', alignItems: 'center' },
+  durationText: { fontSize: 13, color: '#64748B', marginLeft: 5 },
+  priceButton: { backgroundColor: '#0076CB', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10 },
+  priceText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 });
