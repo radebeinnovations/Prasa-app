@@ -17,5 +17,9 @@ export function supabaseErrorMessage(error: unknown, fallback: string) {
     return 'An account already exists for this email. Confirm the email if needed, then continue to Login.';
   }
 
+  if (/email not confirmed|email_not_confirmed/i.test(message)) {
+    return 'Your account was created, but the email is not confirmed yet. Open the confirmation link in your inbox or junk folder, then log in again.';
+  }
+
   return message || fallback;
 }
