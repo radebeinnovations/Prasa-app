@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,13 +27,34 @@ export default function Trains() {
   const selectMapStation = (station: RouteStation) => {
     setSelectedStation(station);
     if (editingEndpoint === 'from') {
-      if (station.code === to.code) setTo(from);
+      if (station.code === to.code) {
+        Alert.alert('Choose another station', 'Your departure and destination stations cannot be the same.');
+        return;
+      }
       setFrom(station);
       setEditingEndpoint('to');
       return;
     }
-    if (station.code === from.code) setFrom(to);
+    if (station.code === from.code) {
+      Alert.alert('Choose another station', 'Your destination must be different from your departure station.');
+      return;
+    }
     setTo(station);
+  };
+
+  const openTrainDetails = (train: LiveTrain) => {
+    router.push({
+      pathname: '/train-details',
+      params: {
+        code: train.train_code,
+        from: from.name,
+        minutes: train.minutes_to_arrival === null ? '' : String(train.minutes_to_arrival),
+        station: train.station,
+        status: train.status,
+        statusColor: train.status_color,
+        to: to.name,
+      },
+    });
   };
 
   const openTickets = () => {
@@ -147,28 +168,30 @@ export default function Trains() {
           {visibleTrains.map((train) => {
             const selected = selectedCode === train.train_code;
             return (
-              <TouchableOpacity
+              <View
                 accessibilityState={{ selected }}
-                accessibilityRole="button"
                 key={train.id}
-                onPress={() => setSelectedCode(train.train_code)}
                 style={[styles.trainItem, selected && styles.trainItemActive]}
               >
-                <View style={[styles.trainIconContainer, selected && styles.trainIconSelected]}>
-                  <Ionicons name="train-outline" size={23} color="#161616" />
-                </View>
-                <View style={styles.trainDetails}>
-                  <View style={styles.trainHeader}>
-                    <Text style={styles.trainCode}>{train.train_code}</Text>
-                    <Text style={styles.trainStation}>{train.station}</Text>
+                <TouchableOpacity accessibilityRole="button" onPress={() => setSelectedCode(train.train_code)} style={styles.trainSummary}>
+                  <View style={[styles.trainIconContainer, selected && styles.trainIconSelected]}>
+                    <Ionicons name="train-outline" size={23} color="#161616" />
                   </View>
-                  <View style={styles.arrivalContainer}>
-                    <View style={[styles.statusDot, { backgroundColor: train.status_color }]} />
-                    <Text style={[styles.arrivalText, { color: train.status_color }]}>{train.status}</Text>
+                  <View style={styles.trainDetails}>
+                    <View style={styles.trainHeader}>
+                      <Text style={styles.trainCode}>{train.train_code}</Text>
+                      <Text style={styles.trainStation}>{train.station}</Text>
+                    </View>
+                    <View style={styles.arrivalContainer}>
+                      <View style={[styles.statusDot, { backgroundColor: train.status_color }]} />
+                      <Text style={[styles.arrivalText, { color: train.status_color }]}>{train.status}</Text>
+                    </View>
                   </View>
-                </View>
-                <Ionicons name="chevron-forward-circle" size={23} color="#0785C5" />
-              </TouchableOpacity>
+                </TouchableOpacity>
+                <TouchableOpacity accessibilityLabel={`View details for train ${train.train_code}`} accessibilityRole="button" onPress={() => openTrainDetails(train)} style={styles.detailsButton}>
+                  <Ionicons name="chevron-forward-circle" size={25} color="#0785C5" />
+                </TouchableOpacity>
+              </View>
             );
           })}
         </ScrollView>
@@ -206,6 +229,8 @@ const styles = StyleSheet.create({
   trainListContent: { paddingBottom: 8 },
   trainItem: { minHeight: 64, flexDirection: 'row', paddingHorizontal: 20, alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E7E7E7' },
   trainItemActive: { backgroundColor: '#D9F3F5', borderBottomColor: '#D9F3F5' },
+  trainSummary: { flex: 1, minHeight: 64, flexDirection: 'row', alignItems: 'center' },
+  detailsButton: { width: 46, height: 52, alignItems: 'flex-end', justifyContent: 'center' },
   trainIconContainer: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   trainIconSelected: { backgroundColor: 'transparent' },
   trainDetails: { flex: 1 },

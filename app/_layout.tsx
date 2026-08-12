@@ -45,6 +45,7 @@ function AppNavigator() {
       <Stack.Screen name="stations" />
       <Stack.Screen name="station-details" />
       <Stack.Screen name="trains" />
+      <Stack.Screen name="train-details" />
       <Stack.Screen name="tickets" />
       <Stack.Screen name="schedule" />
       <Stack.Screen name="parcels" />

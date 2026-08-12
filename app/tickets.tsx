@@ -4,7 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { estimateArrivalTime, estimateJourneyMinutes } from '../lib/route-stations';
+import { SelectField } from '../components/SelectField';
+import { estimateArrivalTime, estimateJourneyMinutes, routeStations } from '../lib/route-stations';
 import { supabase } from '../lib/supabase';
 import { getTicketOptions } from '../lib/ticket-options';
 import type { Station, TicketOption } from '../lib/types';
@@ -13,8 +14,8 @@ export default function Tickets() {
   const router = useRouter();
   const params = useLocalSearchParams<{ from?: string | string[]; to?: string | string[]; date?: string | string[]; startTime?: string | string[] }>();
   const valueOf = (value: string | string[] | undefined, fallback: string) => Array.isArray(value) ? value[0] || fallback : value || fallback;
-  const from = valueOf(params.from, 'Pretoria');
-  const to = valueOf(params.to, 'Park Station');
+  const [from, setFrom] = useState(() => valueOf(params.from, 'Pretoria'));
+  const [to, setTo] = useState(() => valueOf(params.to, 'Park Station'));
   const toLabel = to === 'Park Station' ? 'Johannesburg' : to;
   const date = valueOf(params.date, new Date().toISOString().slice(0, 10));
   const startTime = valueOf(params.startTime, '');
@@ -27,6 +28,9 @@ export default function Tickets() {
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [hasLiveSeatInventory, setHasLiveSeatInventory] = useState(true);
   const [sortByPrice, setSortByPrice] = useState(false);
+  const stationNames = routeStations.map((station) => station.name);
+  const fromOptions = stationNames.filter((station) => station !== to);
+  const toOptions = stationNames.filter((station) => station !== from);
   const options = useMemo(
     () => [...ticketOptions].sort((a, b) => {
       if ((a.seats_remaining === 0) !== (b.seats_remaining === 0)) return a.seats_remaining === 0 ? 1 : -1;
@@ -39,6 +43,12 @@ export default function Tickets() {
   useEffect(() => {
     const loadOptions = async () => {
       setLoading(true);
+      if (from === to) {
+        setTicketOptions([]);
+        setError('Departure and destination stations must be different.');
+        setLoading(false);
+        return;
+      }
       const { data: stationData, error: stationError } = await supabase
         .from('stations')
         .select('id, code, name, area, latitude, longitude')
@@ -131,11 +141,11 @@ export default function Tickets() {
         <View style={styles.tripRow}>
           <View style={styles.tripPoint}>
             <Text style={styles.label}>FROM</Text>
-            <Text numberOfLines={1} style={styles.inputText}>{from}</Text>
+            <SelectField accessibilityLabel="Select departure station" onChange={setFrom} options={fromOptions} value={from} />
           </View>
           <View style={[styles.tripPoint, styles.tripPointRight]}>
             <Text style={styles.label}>TO</Text>
-            <Text numberOfLines={1} style={styles.inputText}>{toLabel}</Text>
+            <SelectField accessibilityLabel="Select destination station" onChange={setTo} options={toOptions} value={to} />
           </View>
         </View>
         <Text style={styles.dateLabel}>Date:</Text>
@@ -201,7 +211,6 @@ const styles = StyleSheet.create({
   tripPoint: { flex: 1 },
   tripPointRight: { alignItems: 'stretch' },
   label: { fontSize: 15, fontWeight: '700', color: '#202020', marginBottom: 10 },
-  inputText: { height: 56, borderRadius: 6, backgroundColor: '#F1F1F1', paddingHorizontal: 14, paddingTop: 17, fontSize: 16, color: '#555555' },
   dateLabel: { fontSize: 15, fontWeight: '700', color: '#202020', marginTop: 17, marginBottom: 10 },
   dateRow: { height: 56, flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F1F1', borderRadius: 6, paddingHorizontal: 14 },
   dateText: { flex: 1, textAlign: 'center', fontSize: 15, color: '#555555', marginRight: 22 },

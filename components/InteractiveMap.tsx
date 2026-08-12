@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Image, PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, PanResponder, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 type Point = { x: number; y: number };
@@ -14,12 +14,12 @@ export function InteractiveMap() {
   const gestureStart = useRef({ scale: 1, offset: { x: 0, y: 0 }, distance: 0, center: { x: 0, y: 0 } });
 
   const constrainOffset = (next: Point, nextScale: number): Point => {
-    const maximum = Math.max(0, (nextScale - 1) * 220);
+    const maximum = 130 + Math.max(0, (nextScale - 1) * 260);
     return { x: clamp(next.x, -maximum, maximum), y: clamp(next.y, -maximum * 1.45, maximum * 1.45) };
   };
 
   const setZoom = (nextScale: number) => {
-    const clampedScale = clamp(nextScale, 1, 3.5);
+    const clampedScale = clamp(nextScale, 0.7, 6);
     setScale(clampedScale);
     setOffset((current) => constrainOffset(current, clampedScale));
   };
@@ -28,6 +28,7 @@ export function InteractiveMap() {
     setScale(1);
     setOffset({ x: 0, y: 0 });
   };
+  const webGestureStyle = Platform.OS === 'web' ? ({ touchAction: 'none' } as never) : undefined;
 
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: (event) => event.nativeEvent.touches.length > 1,
@@ -59,26 +60,24 @@ export function InteractiveMap() {
         }, nextScale));
         return;
       }
-      if (scale > 1) {
-        setOffset(constrainOffset({ x: gestureStart.current.offset.x + state.dx, y: gestureStart.current.offset.y + state.dy }, scale));
-      }
+      setOffset(constrainOffset({ x: gestureStart.current.offset.x + state.dx, y: gestureStart.current.offset.y + state.dy }, scale));
     },
   }), [offset, scale]);
 
   return (
-    <View accessibilityHint="Pinch to zoom and drag to move around the route" style={styles.container} {...panResponder.panHandlers}>
+    <View accessibilityHint="Pinch to zoom and drag to move around the route" style={[styles.container, webGestureStyle]} {...panResponder.panHandlers}>
       <Image
         resizeMode="cover"
         source={require('../assets/route-map.png')}
         style={[styles.map, { transform: [{ translateX: offset.x }, { translateY: offset.y }, { scale }] }]}
       />
       <View pointerEvents="box-none" style={styles.helpWrap}>
-        <View style={styles.helpPill}><Ionicons name="hand-left-outline" size={15} color="#36505D" /><Text style={styles.helpText}>Drag · pinch to zoom</Text></View>
+        <View style={styles.helpPill}><Ionicons name="hand-left-outline" size={15} color="#36505D" /><Text style={styles.helpText}>Drag · pinch or use + / −</Text></View>
       </View>
       <View style={styles.controls}>
-        <TouchableOpacity accessibilityLabel="Zoom out" onPress={() => setZoom(scale - 0.5)} style={styles.controlButton}><Ionicons name="remove" size={22} color="#0785C5" /></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Zoom out" onPress={() => setZoom(scale - 0.35)} style={styles.controlButton}><Ionicons name="remove" size={22} color="#0785C5" /></TouchableOpacity>
         <TouchableOpacity accessibilityLabel="Reset map" onPress={reset} style={styles.controlButton}><Ionicons name="locate-outline" size={19} color="#0785C5" /></TouchableOpacity>
-        <TouchableOpacity accessibilityLabel="Zoom in" onPress={() => setZoom(scale + 0.5)} style={styles.controlButton}><Ionicons name="add" size={22} color="#0785C5" /></TouchableOpacity>
+        <TouchableOpacity accessibilityLabel="Zoom in" onPress={() => setZoom(scale + 0.35)} style={styles.controlButton}><Ionicons name="add" size={22} color="#0785C5" /></TouchableOpacity>
       </View>
     </View>
   );
