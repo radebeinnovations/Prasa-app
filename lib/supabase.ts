@@ -3,8 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, processLock } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const configuredSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim().replace(/\/$/, '');
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+// The first Vercel deployment transposed two characters in the project ref.
+// Keep that deployed build setting compatible while the Vercel variable is corrected.
+const supabaseUrl = configuredSupabaseUrl === 'https://ckhhylvhuhvrlvjmcrfv.supabase.co'
+  ? 'https://ckhhylvhuhrvlvjmcrfv.supabase.co'
+  : configuredSupabaseUrl;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
