@@ -12,7 +12,6 @@ export default function SignUp() {
   const router = useRouter();
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
-  const [idNumber, setIdNumber] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -21,7 +20,7 @@ export default function SignUp() {
   const signUp = async () => {
     const cleanName = displayName.trim();
     const cleanEmail = email.trim().toLowerCase();
-    if (!cleanName || !phone.trim() || !idNumber.trim() || !cleanEmail || !password) {
+    if (!cleanName || !phone.trim() || !cleanEmail || !password) {
       setError('Complete every field.');
       return;
     }
@@ -34,7 +33,7 @@ export default function SignUp() {
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: cleanEmail,
       password,
-      options: { data: { display_name: cleanName, phone: phone.trim(), id_number: idNumber.trim() }, emailRedirectTo: authRedirectUrl },
+      options: { data: { display_name: cleanName, phone: phone.trim() }, emailRedirectTo: authRedirectUrl },
     });
     setLoading(false);
     if (signUpError) {
@@ -56,7 +55,6 @@ export default function SignUp() {
           <View style={styles.avatar}><Ionicons name="person-add-outline" size={39} color="#0785C5" /></View>
           <TextInput placeholder="Name" placeholderTextColor="#888888" value={displayName} onChangeText={setDisplayName} style={styles.input} />
           <TextInput placeholder="Phone Number" placeholderTextColor="#888888" keyboardType="phone-pad" value={phone} onChangeText={setPhone} style={styles.input} />
-          <TextInput placeholder="NIC Number" placeholderTextColor="#888888" value={idNumber} onChangeText={setIdNumber} style={styles.input} />
           <TextInput placeholder="Email" placeholderTextColor="#888888" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} style={styles.input} />
           <TextInput placeholder="Password" placeholderTextColor="#888888" secureTextEntry value={password} onChangeText={setPassword} onSubmitEditing={signUp} style={styles.input} />
           {error ? <Text style={styles.error}>{error}</Text> : null}
