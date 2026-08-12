@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 import type { Session, User } from '@supabase/supabase-js';
 import { completeAuthFromUrl } from '../lib/auth-links';
 import { supabase } from '../lib/supabase';
@@ -65,7 +66,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
 
     Linking.getInitialURL().then((url) => {
-      if (url) void handleUrl(url);
+      const callbackScreenHandlesWebUrl = Platform.OS === 'web' && Boolean(url?.includes('/auth/callback'));
+      if (url && !callbackScreenHandlesWebUrl) void handleUrl(url);
     });
     const linkingListener = Linking.addEventListener('url', ({ url }) => void handleUrl(url));
 
