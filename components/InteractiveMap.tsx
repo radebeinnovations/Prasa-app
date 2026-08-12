@@ -8,13 +8,13 @@ const clamp = (value: number, minimum: number, maximum: number) => Math.min(maxi
 const distance = (first: Point, second: Point) => Math.hypot(second.x - first.x, second.y - first.y);
 const midpoint = (first: Point, second: Point): Point => ({ x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 });
 const mapSource = require('../assets/route-map.png');
-const mapAsset = Image.resolveAssetSource(mapSource);
+const mapDimensions = { width: 1024, height: 1536 };
 
 const constrainOffset = (next: Point, nextScale: number, viewport: Point): Point => {
-  if (!viewport.x || !viewport.y || !mapAsset.width || !mapAsset.height) return next;
-  const coverScale = Math.max(viewport.x / mapAsset.width, viewport.y / mapAsset.height);
-  const renderedWidth = mapAsset.width * coverScale * nextScale;
-  const renderedHeight = mapAsset.height * coverScale * nextScale;
+  if (!viewport.x || !viewport.y) return next;
+  const coverScale = Math.max(viewport.x / mapDimensions.width, viewport.y / mapDimensions.height);
+  const renderedWidth = mapDimensions.width * coverScale * nextScale;
+  const renderedHeight = mapDimensions.height * coverScale * nextScale;
   const maximumX = Math.max(0, (renderedWidth - viewport.x) / 2);
   const maximumY = Math.max(0, (renderedHeight - viewport.y) / 2);
   return {
