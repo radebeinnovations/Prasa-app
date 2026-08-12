@@ -1,12 +1,20 @@
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import type { Provider } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
-export const authRedirectUrl = Linking.createURL('/auth/callback');
-export const passwordResetRedirectUrl = Linking.createURL('/reset-password');
+const redirectUrl = (path: string) => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    return `${window.location.origin}${path}`;
+  }
+  return Linking.createURL(path);
+};
+
+export const authRedirectUrl = redirectUrl('/auth/callback');
+export const passwordResetRedirectUrl = redirectUrl('/reset-password');
 
 function authParams(url: string) {
   const query = url.includes('?') ? url.split('?')[1].split('#')[0] : '';
@@ -38,6 +46,15 @@ export async function completeAuthFromUrl(url: string) {
 }
 
 export async function signInWithProvider(provider: Extract<Provider, 'google' | 'facebook'>) {
+  if (Platform.OS === 'web') {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: authRedirectUrl },
+    });
+    if (error) throw error;
+    return;
+  }
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {

@@ -47,6 +47,35 @@ npm run doctor
 npx expo export --platform all
 ```
 
+## Deploy the web app to Vercel
+
+The repository contains `vercel.json`, so Vercel can build the Expo Router web app without manual framework detection.
+
+Use these import settings:
+
+- Framework Preset: **Other**
+- Root Directory: `./`
+- Build Command: `npm run vercel-build`
+- Output Directory: `dist`
+- Install Command: leave at the automatic default
+
+Add these variables to both **Production** and **Preview**:
+
+```text
+EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_OR_PUBLISHABLE_KEY
+```
+
+Never add a Supabase `service_role` or secret key to Vercel for this client-side Expo app.
+
+After Vercel gives you the production URL, open Supabase **Authentication > URL Configuration** and set:
+
+- Site URL: the exact production Vercel URL
+- Redirect URL: `https://your-project.vercel.app/**`
+- Optional preview redirect: `https://*-your-team-slug.vercel.app/**`
+
+The Vercel deployment is intentionally a hosted mobile app, not a responsive desktop website. Desktop browsers display the original 428 × 926 mobile design frame; phone browsers use the full available viewport. Screens, spacing, navigation, and content remain the same as the Expo Go app.
+
 ## Useful scripts
 
 - `npm start` — start Expo normally

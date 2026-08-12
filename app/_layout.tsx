@@ -56,17 +56,22 @@ function AppNavigator() {
 
 export default function Layout() {
   return (
-    <SafeAreaProvider>
-      <View style={[styles.shell, Platform.OS === 'web' && styles.webShell]}>
-        <StatusBar style="dark" />
-        <AuthProvider><AppNavigator /></AuthProvider>
+    <SafeAreaProvider style={styles.safeArea}>
+      <View style={[styles.viewport, Platform.OS === 'web' && styles.webViewport]}>
+        <View style={[styles.shell, Platform.OS === 'web' && styles.webShell]}>
+          <StatusBar style="dark" />
+          <AuthProvider><AppNavigator /></AuthProvider>
+        </View>
       </View>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1 },
+  viewport: { flex: 1, width: '100%', backgroundColor: '#FFFFFF' },
+  webViewport: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8EEF2' },
   shell: { flex: 1, width: '100%', backgroundColor: '#FFFFFF' },
-  webShell: { maxWidth: 428, alignSelf: 'center', shadowColor: '#000000', shadowOpacity: 0.08, shadowRadius: 16 },
+  webShell: { width: '100%', maxWidth: 428, maxHeight: 926, alignSelf: 'center', shadowColor: '#000000', shadowOpacity: 0.14, shadowRadius: 24, elevation: 6 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
 });

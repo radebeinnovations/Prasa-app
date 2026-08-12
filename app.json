@@ -22,7 +22,9 @@
       "package": "za.co.prasa.mobile"
     },
     "web": {
-      "favicon": "./assets/transit-app-icon.png"
+      "bundler": "metro",
+      "favicon": "./assets/transit-app-icon.png",
+      "output": "single"
     },
     "scheme": "prasa-app",
     "plugins": [
