@@ -12,9 +12,9 @@ const mapDimensions = { width: 1024, height: 1536 };
 
 const constrainOffset = (next: Point, nextScale: number, viewport: Point): Point => {
   if (!viewport.x || !viewport.y) return next;
-  const coverScale = Math.max(viewport.x / mapDimensions.width, viewport.y / mapDimensions.height);
-  const renderedWidth = mapDimensions.width * coverScale * nextScale;
-  const renderedHeight = mapDimensions.height * coverScale * nextScale;
+  const containScale = Math.min(viewport.x / mapDimensions.width, viewport.y / mapDimensions.height);
+  const renderedWidth = mapDimensions.width * containScale * nextScale;
+  const renderedHeight = mapDimensions.height * containScale * nextScale;
   const maximumX = Math.max(0, (renderedWidth - viewport.x) / 2);
   const maximumY = Math.max(0, (renderedHeight - viewport.y) / 2);
   return {
@@ -99,7 +99,7 @@ export function InteractiveMap() {
       {...panResponder.panHandlers}
     >
       <View pointerEvents="none" style={[styles.mapLayer, { transform: [{ translateX: offset.x }, { translateY: offset.y }] }]}>
-        <Image resizeMode="cover" source={mapSource} style={[styles.map, { transform: [{ scale }] }]} />
+        <Image resizeMode="contain" source={mapSource} style={[styles.map, { transform: [{ scale }] }]} />
       </View>
       <View pointerEvents="box-none" style={styles.helpWrap}>
         <View style={styles.helpPill}><Ionicons name="hand-left-outline" size={15} color="#36505D" /><Text style={styles.helpText}>Drag · pinch or use + / −</Text></View>
