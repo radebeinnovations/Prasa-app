@@ -1,23 +1,37 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SelectField } from '../components/SelectField';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { supabase } from '../lib/supabase';
+import type { Station } from '../lib/types';
 
-const stations = ['Pretoria', 'Centurion', 'Midrand', 'Sandton', 'Park Station', 'Nasrec'];
 const items = ['Documents', 'Small parcel', 'Medium parcel', 'Large parcel'];
-const services = ['Normal', 'Priority'];
+const services = ['Normal', 'Priority', 'Same day'];
 
 export default function Parcels() {
   const router = useRouter();
+  const [stations, setStations] = useState<Station[]>([]);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [item, setItem] = useState('');
   const [service, setService] = useState('Normal');
   const [weight, setWeight] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<{ estimatedPrice: number; trackingCode: string } | null>(null);
+  const stationNames = useMemo(() => stations.map((station) => station.name), [stations]);
 
-  const calculate = () => {
+  useEffect(() => {
+    supabase.from('stations').select('id, code, name, area, latitude, longitude').eq('active', true).order('name').then(({ data, error: loadError }) => {
+      if (loadError) setError(loadError.message);
+      else setStations((data ?? []) as Station[]);
+    });
+  }, []);
+
+  const createOrder = () => {
     const numericWeight = Number(weight.replace(',', '.'));
     if (!from || !to || !item || !service || !weight) {
       Alert.alert('Complete the parcel details', 'Select each option and enter the parcel weight.');
@@ -31,39 +45,69 @@ export default function Parcels() {
       Alert.alert('Invalid weight', 'Enter a weight between 0.1 kg and 30 kg.');
       return;
     }
-    const itemFee = item === 'Documents' ? 15 : item === 'Small parcel' ? 25 : item === 'Medium parcel' ? 40 : 60;
-    const multiplier = service === 'Priority' ? 1.5 : 1;
-    const total = (itemFee + numericWeight * 8) * multiplier;
-    Alert.alert('Estimated parcel price', `R${total.toFixed(2)}\n${from} to ${to}\n${service} service`, [
-      { text: 'Done' },
+    const origin = stations.find((station) => station.name === from);
+    const destination = stations.find((station) => station.name === to);
+    if (!origin || !destination) {
+      Alert.alert('Stations unavailable', 'Refresh the screen and select the stations again.');
+      return;
+    }
+    Alert.alert('Create parcel order?', `${from} to ${to}\n${numericWeight.toFixed(1)} kg · ${service}`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Create', onPress: () => void saveOrder(origin.id, destination.id, numericWeight) },
     ]);
   };
 
+  const saveOrder = async (originId: number, destinationId: number, numericWeight: number) => {
+    setSaving(true);
+    const { data, error: orderError } = await supabase.rpc('create_parcel_order', {
+      p_origin_station_id: originId,
+      p_destination_station_id: destinationId,
+      p_item_type: item,
+      p_service_level: service,
+      p_weight_kg: numericWeight,
+    });
+    setSaving(false);
+    if (orderError) {
+      Alert.alert('Could not create order', orderError.message);
+      return;
+    }
+    const result = (Array.isArray(data) ? data[0] : data) as { estimated_price?: number; tracking_code?: string } | null;
+    setResult({ estimatedPrice: Number(result?.estimated_price ?? 0), trackingCode: result?.tracking_code ?? 'Pending' });
+  };
+
+  if (result) {
+    return (
+      <SafeAreaView edges={['top', 'bottom']} style={styles.resultContainer}>
+        <ScreenHeader title="Parcels" />
+        <Text style={styles.resultIntro}>Your parcel order is ready and the transport cost is</Text>
+        <Text style={styles.resultPrice}>R {result.estimatedPrice.toFixed(2)} + VAT</Text>
+        <Ionicons name="cube" size={112} color="#E7F5FB" style={styles.resultCube} />
+        <Text style={styles.tracking}>Tracking: {result.trackingCode}</Text>
+        <TouchableOpacity onPress={() => setResult(null)} style={styles.okButton}><Text style={styles.okText}>Ok</Text></TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity accessibilityLabel="Go back" accessibilityRole="button" onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#0076CB" />
-          <Text style={styles.headerTitle}>Parcels</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader title="Parcels" />
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.intro}>Get an estimated station-to-station parcel price.</Text>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
         <View style={styles.formGroup}>
-          <Text style={styles.label}>From</Text>
-          <SelectField accessibilityLabel="Select collection station" onChange={setFrom} options={stations} value={from} />
+          <Text style={styles.label}>From:</Text>
+          <SelectField accessibilityLabel="Select collection station" onChange={setFrom} options={stationNames} value={from} />
         </View>
         <View style={styles.formGroup}>
-          <Text style={styles.label}>To</Text>
-          <SelectField accessibilityLabel="Select destination station" onChange={setTo} options={stations} value={to} />
+          <Text style={styles.label}>To:</Text>
+          <SelectField accessibilityLabel="Select destination station" onChange={setTo} options={stationNames} value={to} />
         </View>
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Item</Text>
+          <Text style={styles.label}>Item:</Text>
           <SelectField accessibilityLabel="Select parcel type" onChange={setItem} options={items} value={item} />
         </View>
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Service</Text>
+          <Text style={styles.label}>Train:</Text>
           <SelectField accessibilityLabel="Select parcel service" onChange={setService} options={services} value={service} />
         </View>
         <View style={styles.formGroup}>
@@ -83,10 +127,9 @@ export default function Parcels() {
           </View>
         </View>
 
-        <TouchableOpacity accessibilityRole="button" onPress={calculate} style={styles.calculateButton}>
-          <Text style={styles.calculateButtonText}>Calculate estimate</Text>
+        <TouchableOpacity accessibilityRole="button" disabled={saving} onPress={createOrder} style={[styles.calculateButton, saving && styles.disabled]}>
+          <Text style={styles.calculateButtonText}>{saving ? 'Calculating…' : 'Calculate'}</Text>
         </TouchableOpacity>
-        <Text style={styles.disclaimer}>Estimates are for demo purposes and are not live PRASA rates.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -94,17 +137,21 @@ export default function Parcels() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: { paddingHorizontal: 20, paddingVertical: 12 },
-  backButton: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
-  headerTitle: { fontSize: 20, color: '#0076CB', fontWeight: '700', marginLeft: 5 },
-  content: { padding: 20, flexGrow: 1 },
-  intro: { color: '#64748B', fontSize: 14, lineHeight: 21, marginBottom: 24 },
-  formGroup: { flexDirection: 'row', alignItems: 'center', marginBottom: 22, gap: 14 },
-  label: { fontSize: 15, fontWeight: '700', color: '#0F172A', flex: 1 },
-  inputWrapper: { flex: 1.5, minHeight: 52, backgroundColor: '#F1F5F9', borderRadius: 10, flexDirection: 'row', alignItems: 'center', paddingRight: 15 },
-  input: { flex: 1, paddingHorizontal: 15, fontSize: 16, color: '#0F172A' },
-  unit: { color: '#64748B', fontWeight: '600' },
-  calculateButton: { backgroundColor: '#0076CB', padding: 17, borderRadius: 10, alignItems: 'center', marginTop: 'auto' },
+  content: { paddingHorizontal: 28, paddingTop: 40, paddingBottom: 26, flexGrow: 1 },
+  errorText: { color: '#B91C1C', fontSize: 14, marginBottom: 18 },
+  formGroup: { flexDirection: 'row', alignItems: 'center', marginBottom: 27, gap: 14 },
+  label: { fontSize: 16, fontWeight: '700', color: '#202020', flex: 1 },
+  inputWrapper: { flex: 1.5, minHeight: 56, backgroundColor: '#F1F1F1', borderRadius: 6, flexDirection: 'row', alignItems: 'center', paddingRight: 14 },
+  input: { flex: 1, paddingHorizontal: 14, fontSize: 16, color: '#343434' },
+  unit: { color: '#777777', fontSize: 14 },
+  calculateButton: { backgroundColor: '#0785C5', height: 60, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginTop: 'auto' },
   calculateButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
-  disclaimer: { textAlign: 'center', color: '#64748B', fontSize: 11, lineHeight: 16, marginTop: 12 },
+  disabled: { opacity: 0.6 },
+  resultContainer: { flex: 1, backgroundColor: '#FFFFFF', paddingBottom: 40 },
+  resultIntro: { color: '#5F5F5F', fontSize: 16, lineHeight: 22, marginHorizontal: 28, marginTop: 20, maxWidth: 320 },
+  resultPrice: { color: '#20A83A', fontSize: 21, fontWeight: '800', textAlign: 'center', marginTop: 72 },
+  resultCube: { alignSelf: 'center', marginTop: 82 },
+  tracking: { color: '#666666', fontSize: 14, textAlign: 'center', marginTop: 22 },
+  okButton: { width: 126, height: 60, borderRadius: 6, backgroundColor: '#0785C5', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginTop: 'auto' },
+  okText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
 });

@@ -84,25 +84,25 @@ export function SelectField({
 const styles = StyleSheet.create({
   field: {
     flex: 1.5,
-    minHeight: 52,
-    backgroundColor: '#F1F5F9',
+    minHeight: 56,
+    backgroundColor: '#F1F1F1',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 15,
-    borderRadius: 10,
+    paddingHorizontal: 14,
+    borderRadius: 6,
   },
   value: {
     flex: 1,
     marginRight: 8,
     fontSize: 16,
-    color: '#1E293B',
+    color: '#343434',
   },
   placeholder: {
     flex: 1,
     marginRight: 8,
     fontSize: 16,
-    color: '#64748B',
+    color: '#777777',
   },
   overlay: {
     flex: 1,

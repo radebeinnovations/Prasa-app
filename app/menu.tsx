@@ -2,6 +2,7 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../lib/supabase';
 
 type MenuRoute = '/home' | '/trains' | '/tickets' | '/schedule' | '/parcels' | '/stations' | '/notifications';
 
@@ -24,7 +25,12 @@ export default function Menu() {
       {
         text: 'Log out',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
+          const { error } = await supabase.auth.signOut();
+          if (error) {
+            Alert.alert('Could not log out', error.message);
+            return;
+          }
           router.dismissAll();
           router.replace('/login');
         },

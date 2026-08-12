@@ -1,76 +1,102 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { supabase } from '../lib/supabase';
+import type { AppNotification } from '../lib/types';
+import { useAuth } from '../providers/AuthProvider';
 
-const notifications = [
-  { id: 'arrival-change', section: 'Today', icon: 'megaphone' as const, message: 'The Pretoria to Johannesburg train now arrives at platform 1.', time: 'Now', unread: true },
-  { id: 'train-arrival', section: 'Today', icon: 'train' as const, message: 'Train KTS/MDA-1122 is arriving now.', time: '5 min', unread: false },
-  { id: 'parcel', section: 'Yesterday', icon: 'cube' as const, message: 'Your parcel is ready for delivery. Payment is due on collection.', time: '20 May', unread: true },
-  { id: 'ticket', section: 'Yesterday', icon: 'ticket' as const, message: 'Your demo ticket reservation was successful.', time: '20 May', unread: false },
-  { id: 'website', section: 'Yesterday', icon: 'globe' as const, message: 'Visit the official PRASA website for agency information.', time: '20 May', unread: false, url: 'https://www.prasa.com/' },
-];
+const notificationIcons: Record<AppNotification['type'], keyof typeof Ionicons.glyphMap> = {
+  info: 'information-circle', ticket: 'ticket', parcel: 'cube', service: 'megaphone', security: 'shield-checkmark',
+};
+const iconFor = (type: AppNotification['type']) => notificationIcons[type];
+
+const sectionFor = (dateValue: string) => {
+  const created = new Date(dateValue);
+  const today = new Date();
+  if (created.toDateString() === today.toDateString()) return 'Today';
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  return created.toDateString() === yesterday.toDateString() ? 'Yesterday' : 'Earlier';
+};
 
 export default function Notifications() {
   const router = useRouter();
-  const initialUnread = notifications.filter((item) => item.unread).map((item) => item.id);
-  const [unreadIds, setUnreadIds] = useState(() => new Set(initialUnread));
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const unreadCount = notifications.filter((item) => !item.read_at).length;
 
-  const openNotification = (id: string, url?: string) => {
-    setUnreadIds((current) => {
-      const next = new Set(current);
-      next.delete(id);
-      return next;
-    });
-    if (url) {
-      Linking.openURL(url).catch(() => Alert.alert('Could not open website', 'Please try again when you have an internet connection.'));
+  const loadNotifications = useCallback(async () => {
+    if (!user) return;
+    const { data, error: loadError } = await supabase
+      .from('notifications')
+      .select('id, type, title, message, url, read_at, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    setLoading(false);
+    if (loadError) setError(loadError.message);
+    else {
+      setError('');
+      setNotifications((data ?? []) as AppNotification[]);
     }
+  }, [user]);
+
+  useFocusEffect(useCallback(() => { void loadNotifications(); }, [loadNotifications]));
+
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`notifications:${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => void loadNotifications())
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [loadNotifications, user]);
+
+  const sections = useMemo(() => ['Today', 'Yesterday', 'Earlier'].map((title) => ({
+    title,
+    items: notifications.filter((item) => sectionFor(item.created_at) === title),
+  })).filter((section) => section.items.length > 0), [notifications]);
+
+  const openNotification = async (item: AppNotification) => {
+    if (!item.read_at) {
+      const readAt = new Date().toISOString();
+      const { error: updateError } = await supabase.from('notifications').update({ read_at: readAt }).eq('id', item.id);
+      if (updateError) Alert.alert('Could not update notification', updateError.message);
+      else setNotifications((current) => current.map((entry) => entry.id === item.id ? { ...entry, read_at: readAt } : entry));
+    }
+    if (item.url) Linking.openURL(item.url).catch(() => Alert.alert('Could not open website', 'Please try again when you have an internet connection.'));
+  };
+
+  const markAllRead = async () => {
+    if (!user || unreadCount === 0) return;
+    const readAt = new Date().toISOString();
+    const { error: updateError } = await supabase.from('notifications').update({ read_at: readAt }).eq('user_id', user.id).is('read_at', null);
+    if (updateError) Alert.alert('Could not update notifications', updateError.message);
+    else setNotifications((current) => current.map((item) => ({ ...item, read_at: item.read_at ?? readAt })));
   };
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity accessibilityLabel="Go back" accessibilityRole="button" onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#0076CB" />
-          <Text style={styles.headerTitle}>Notifications</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          accessibilityLabel="Mark all notifications as read"
-          accessibilityRole="button"
-          disabled={unreadIds.size === 0}
-          onPress={() => setUnreadIds(new Set())}
-          style={styles.markAllButton}
-        >
-          <Text style={[styles.markAllText, unreadIds.size === 0 && styles.markAllDisabled]}>Mark all read</Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader title="Notifications" right={<TouchableOpacity accessibilityLabel="Mark all notifications as read" disabled={unreadCount === 0} onPress={() => void markAllRead()} style={styles.markAllButton}><Ionicons name="checkmark-done" size={20} color={unreadCount === 0 ? '#BDBDBD' : '#0785C5'} /></TouchableOpacity>} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {['Today', 'Yesterday'].map((section) => (
-          <View key={section}>
-            <Text style={styles.sectionTitle}>{section}</Text>
-            {notifications.filter((item) => item.section === section).map((item) => {
-              const unread = unreadIds.has(item.id);
+        {loading ? <Text style={styles.emptyText}>Loading notifications…</Text> : null}
+        {error ? <Text style={styles.emptyText}>{error}</Text> : null}
+        {!loading && !error && notifications.length === 0 ? <Text style={styles.emptyText}>You have no notifications yet.</Text> : null}
+        {sections.map((section) => (
+          <View key={section.title}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            {section.items.map((item) => {
+              const unread = !item.read_at;
               return (
-                <TouchableOpacity
-                  accessibilityHint={item.url ? 'Opens the official PRASA website' : 'Marks this notification as read'}
-                  accessibilityRole={item.url ? 'link' : 'button'}
-                  key={item.id}
-                  onPress={() => openNotification(item.id, item.url)}
-                  style={[styles.notificationItem, unread && styles.unreadBackground]}
-                >
-                  <View style={styles.iconContainer}>
-                    {unread ? <View style={styles.unreadDot} /> : null}
-                    <View style={styles.iconCircle}>
-                      <Ionicons name={item.icon} size={23} color="#0076CB" />
-                    </View>
-                  </View>
-                  <View style={styles.textContainer}>
-                    <Text style={styles.messageText}>{item.message}</Text>
-                    {item.url ? <Text style={styles.linkText}>www.prasa.com</Text> : null}
-                  </View>
-                  <Text style={styles.timeText}>{item.time}</Text>
+                <TouchableOpacity accessibilityHint={item.url ? 'Opens the attached website' : 'Marks this notification as read'} accessibilityRole={item.url ? 'link' : 'button'} key={item.id} onPress={() => void openNotification(item)} style={[styles.notificationItem, unread && styles.unreadBackground]}>
+                  <View style={styles.iconContainer}>{unread ? <View style={styles.unreadDot} /> : null}<View style={styles.iconCircle}><Ionicons name={iconFor(item.type)} size={23} color="#0076CB" /></View></View>
+                  <View style={styles.textContainer}><Text style={styles.titleText}>{item.title}</Text><Text style={styles.messageText}>{item.message}</Text>{item.url ? <Text style={styles.linkText}>Open link</Text> : null}</View>
+                  <Text style={styles.timeText}>{new Date(item.created_at).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -83,21 +109,18 @@ export default function Notifications() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E2E8F0' },
-  backButton: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
-  headerTitle: { fontSize: 20, color: '#0076CB', fontWeight: '700', marginLeft: 5 },
   markAllButton: { minHeight: 44, justifyContent: 'center' },
-  markAllText: { color: '#0076CB', fontSize: 12, fontWeight: '700' },
-  markAllDisabled: { color: '#94A3B8' },
-  content: { paddingBottom: 24 },
-  sectionTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A', paddingHorizontal: 20, paddingTop: 22, paddingBottom: 8 },
-  notificationItem: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 15, alignItems: 'flex-start', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E2E8F0' },
-  unreadBackground: { backgroundColor: '#EFF6FF' },
-  iconContainer: { marginRight: 14, position: 'relative' },
-  iconCircle: { width: 48, height: 48, borderRadius: 16, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' },
-  unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#0076CB', position: 'absolute', top: -2, left: -2, zIndex: 1, borderWidth: 2, borderColor: '#FFFFFF' },
+  content: { paddingBottom: 24, flexGrow: 1 },
+  emptyText: { textAlign: 'center', color: '#777777', margin: 30, lineHeight: 21, fontSize: 15 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#202020', paddingHorizontal: 24, paddingTop: 20, paddingBottom: 10 },
+  notificationItem: { minHeight: 86, flexDirection: 'row', paddingHorizontal: 24, paddingVertical: 11, alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEEEEE' },
+  unreadBackground: { backgroundColor: '#F0F4FF' },
+  iconContainer: { marginRight: 12, position: 'relative' },
+  iconCircle: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#F1F1F1', justifyContent: 'center', alignItems: 'center' },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#0785C5', position: 'absolute', top: 0, left: 0, zIndex: 1, borderWidth: 1, borderColor: '#FFFFFF' },
   textContainer: { flex: 1, paddingRight: 10 },
-  messageText: { fontSize: 14, color: '#334155', lineHeight: 20 },
-  linkText: { color: '#0076CB', fontWeight: '700', fontSize: 13, marginTop: 4 },
-  timeText: { fontSize: 11, color: '#64748B', marginTop: 2 },
+  titleText: { fontSize: 15, fontWeight: '800', color: '#333333', marginBottom: 3 },
+  messageText: { fontSize: 14, color: '#5D5D5D', lineHeight: 19 },
+  linkText: { color: '#0785C5', fontSize: 13, fontWeight: '600', marginTop: 3 },
+  timeText: { fontSize: 12, color: '#888888', marginLeft: 6 },
 });
