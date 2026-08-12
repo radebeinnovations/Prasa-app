@@ -68,10 +68,10 @@ export default function Layout() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
-  viewport: { flex: 1, width: '100%', backgroundColor: '#FFFFFF' },
+  safeArea: { flex: 1, minHeight: 0 },
+  viewport: { flex: 1, minHeight: 0, width: '100%', overflow: 'hidden', backgroundColor: '#FFFFFF' },
   webViewport: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8EEF2' },
-  shell: { flex: 1, width: '100%', backgroundColor: '#FFFFFF' },
-  webShell: { width: '100%', maxWidth: 428, maxHeight: 926, alignSelf: 'center', shadowColor: '#000000', shadowOpacity: 0.14, shadowRadius: 24, elevation: 6 },
+  shell: { flex: 1, minHeight: 0, width: '100%', overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  webShell: { height: '100%', width: '100%', maxWidth: 428, maxHeight: 926, alignSelf: 'center', shadowColor: '#000000', shadowOpacity: 0.14, shadowRadius: 24, elevation: 6 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
 });

@@ -12,8 +12,9 @@ export default function Root({ children }: PropsWithChildren) {
         <title>PRASA App</title>
         <ScrollViewStyleReset />
         <style dangerouslySetInnerHTML={{ __html: `
-          html, body, #root { width: 100%; height: 100%; height: 100dvh; }
-          body { margin: 0; overflow: hidden; background: #e8eef2; }
+          html { width: 100%; height: 100%; height: 100dvh; overflow: hidden; }
+          body, #root { width: 100%; height: 100%; min-height: 0; overflow: hidden; }
+          body { position: fixed; inset: 0; margin: 0; background: #e8eef2; }
           * { box-sizing: border-box; }
           @media (max-width: 428px), (max-height: 926px) {
             body { background: #ffffff; }
