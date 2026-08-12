@@ -7,24 +7,46 @@ type Point = { x: number; y: number };
 const clamp = (value: number, minimum: number, maximum: number) => Math.min(maximum, Math.max(minimum, value));
 const distance = (first: Point, second: Point) => Math.hypot(second.x - first.x, second.y - first.y);
 const midpoint = (first: Point, second: Point): Point => ({ x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 });
+const mapSource = require('../assets/route-map.png');
+const mapAsset = Image.resolveAssetSource(mapSource);
+
+const constrainOffset = (next: Point, nextScale: number, viewport: Point): Point => {
+  if (!viewport.x || !viewport.y || !mapAsset.width || !mapAsset.height) return next;
+  const coverScale = Math.max(viewport.x / mapAsset.width, viewport.y / mapAsset.height);
+  const renderedWidth = mapAsset.width * coverScale * nextScale;
+  const renderedHeight = mapAsset.height * coverScale * nextScale;
+  const maximumX = Math.max(0, (renderedWidth - viewport.x) / 2);
+  const maximumY = Math.max(0, (renderedHeight - viewport.y) / 2);
+  return {
+    x: clamp(next.x, -maximumX, maximumX),
+    y: clamp(next.y, -maximumY, maximumY),
+  };
+};
 
 export function InteractiveMap() {
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
+  const scaleRef = useRef(1);
+  const offsetRef = useRef<Point>({ x: 0, y: 0 });
+  const viewportRef = useRef<Point>({ x: 0, y: 0 });
   const gestureStart = useRef({ scale: 1, offset: { x: 0, y: 0 }, distance: 0, center: { x: 0, y: 0 } });
 
-  const constrainOffset = (next: Point, nextScale: number): Point => {
-    const maximum = 130 + Math.max(0, (nextScale - 1) * 260);
-    return { x: clamp(next.x, -maximum, maximum), y: clamp(next.y, -maximum * 1.45, maximum * 1.45) };
+  const updateOffset = (next: Point, nextScale = scaleRef.current) => {
+    const constrained = constrainOffset(next, nextScale, viewportRef.current);
+    offsetRef.current = constrained;
+    setOffset(constrained);
   };
 
   const setZoom = (nextScale: number) => {
-    const clampedScale = clamp(nextScale, 0.7, 6);
+    const clampedScale = clamp(nextScale, 0.75, 6);
+    scaleRef.current = clampedScale;
     setScale(clampedScale);
-    setOffset((current) => constrainOffset(current, clampedScale));
+    updateOffset(offsetRef.current, clampedScale);
   };
 
   const reset = () => {
+    scaleRef.current = 1;
+    offsetRef.current = { x: 0, y: 0 };
     setScale(1);
     setOffset({ x: 0, y: 0 });
   };
@@ -39,8 +61,8 @@ export function InteractiveMap() {
       const second = touches[1];
       const center = second ? midpoint({ x: first.pageX, y: first.pageY }, { x: second.pageX, y: second.pageY }) : { x: first.pageX, y: first.pageY };
       gestureStart.current = {
-        scale,
-        offset,
+        scale: scaleRef.current,
+        offset: offsetRef.current,
         distance: second ? distance({ x: first.pageX, y: first.pageY }, { x: second.pageX, y: second.pageY }) : 0,
         center,
       };
@@ -52,25 +74,33 @@ export function InteractiveMap() {
         const second = { x: touches[1].pageX, y: touches[1].pageY };
         const currentDistance = distance(first, second);
         const currentCenter = midpoint(first, second);
-        const nextScale = clamp(gestureStart.current.scale * (currentDistance / Math.max(gestureStart.current.distance, 1)), 1, 3.5);
+        const nextScale = clamp(gestureStart.current.scale * (currentDistance / Math.max(gestureStart.current.distance, 1)), 0.75, 6);
+        scaleRef.current = nextScale;
         setScale(nextScale);
-        setOffset(constrainOffset({
+        updateOffset({
           x: gestureStart.current.offset.x + currentCenter.x - gestureStart.current.center.x,
           y: gestureStart.current.offset.y + currentCenter.y - gestureStart.current.center.y,
-        }, nextScale));
+        }, nextScale);
         return;
       }
-      setOffset(constrainOffset({ x: gestureStart.current.offset.x + state.dx, y: gestureStart.current.offset.y + state.dy }, scale));
+      updateOffset({ x: gestureStart.current.offset.x + state.dx, y: gestureStart.current.offset.y + state.dy });
     },
-  }), [offset, scale]);
+    onPanResponderTerminationRequest: () => false,
+  }), []);
 
   return (
-    <View accessibilityHint="Pinch to zoom and drag to move around the route" style={[styles.container, webGestureStyle]} {...panResponder.panHandlers}>
-      <Image
-        resizeMode="cover"
-        source={require('../assets/route-map.png')}
-        style={[styles.map, { transform: [{ translateX: offset.x }, { translateY: offset.y }, { scale }] }]}
-      />
+    <View
+      accessibilityHint="Pinch to zoom and drag to move around the route"
+      onLayout={(event) => {
+        viewportRef.current = { x: event.nativeEvent.layout.width, y: event.nativeEvent.layout.height };
+        updateOffset(offsetRef.current);
+      }}
+      style={[styles.container, webGestureStyle]}
+      {...panResponder.panHandlers}
+    >
+      <View pointerEvents="none" style={[styles.mapLayer, { transform: [{ translateX: offset.x }, { translateY: offset.y }] }]}>
+        <Image resizeMode="cover" source={mapSource} style={[styles.map, { transform: [{ scale }] }]} />
+      </View>
       <View pointerEvents="box-none" style={styles.helpWrap}>
         <View style={styles.helpPill}><Ionicons name="hand-left-outline" size={15} color="#36505D" /><Text style={styles.helpText}>Drag · pinch or use + / −</Text></View>
       </View>
@@ -85,6 +115,7 @@ export function InteractiveMap() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, overflow: 'hidden', backgroundColor: '#EAF1E5' },
+  mapLayer: { ...StyleSheet.absoluteFillObject },
   map: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   helpWrap: { position: 'absolute', left: 0, right: 0, bottom: 12, alignItems: 'center' },
   helpPill: { minHeight: 30, paddingHorizontal: 12, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.9)', flexDirection: 'row', alignItems: 'center', gap: 6 },
