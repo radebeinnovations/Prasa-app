@@ -40,12 +40,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (mounted) {
-        setSession(data.session);
-        setLoading(false);
-      }
-    });
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (mounted) setSession(data.session);
+      })
+      .catch((error) => {
+        console.warn('Could not restore the Supabase session:', error);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);

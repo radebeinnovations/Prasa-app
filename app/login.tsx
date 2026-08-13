@@ -24,9 +24,14 @@ export default function Login() {
     }
     setError('');
     setLoading(true);
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
-    setLoading(false);
-    if (signInError) setError(supabaseErrorMessage(signInError, 'Login failed.'));
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+      if (signInError) setError(supabaseErrorMessage(signInError, 'Login failed.'));
+    } catch (signInFailure) {
+      setError(supabaseErrorMessage(signInFailure, 'Login failed.'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const socialLogin = async (provider: 'google' | 'facebook') => {

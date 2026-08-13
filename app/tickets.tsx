@@ -41,56 +41,78 @@ export default function Tickets() {
   const availableOptionCount = options.filter((option) => option.seats_remaining !== 0).length;
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadOptions = async () => {
       setLoading(true);
+      setStationIds(null);
       if (from === to) {
-        setTicketOptions([]);
-        setError('Departure and destination stations must be different.');
+        if (!cancelled) {
+          setTicketOptions([]);
+          setError('Departure and destination stations must be different.');
+          setLoading(false);
+        }
+        return;
+      }
+      try {
+        const { data: stationData, error: stationError } = await supabase
+          .from('stations')
+          .select('id, code, name, area, latitude, longitude')
+          .in('name', [from, to]);
+        if (stationError) {
+          if (!cancelled) {
+            setError(stationError.message);
+            setLoading(false);
+          }
+          return;
+        }
+        const foundStations = (stationData ?? []) as Station[];
+        const origin = foundStations.find((station) => station.name === from);
+        const destination = foundStations.find((station) => station.name === to);
+        if (!origin || !destination) {
+          if (!cancelled) {
+            setError('One or both selected stations are not available.');
+            setLoading(false);
+          }
+          return;
+        }
+        const optionsResult = await getTicketOptions({
+          originStationId: origin.id,
+          destinationStationId: destination.id,
+          earliestTime: startTime || null,
+          travelDate: date,
+        });
+        if (cancelled) return;
+
+        setStationIds({ origin: origin.id, destination: destination.id });
         setLoading(false);
-        return;
+        if (optionsResult.error) {
+          setError(optionsResult.error);
+          return;
+        }
+        setError('');
+        setHasLiveSeatInventory(optionsResult.hasLiveSeatInventory);
+        setTicketOptions(optionsResult.data.map((ticket) => {
+          const estimatedDuration = estimateJourneyMinutes(from, to, ticket.duration_minutes);
+          const estimatedArrival = estimateArrivalTime(ticket.departure_time, estimatedDuration);
+          return {
+            ...ticket,
+            arrival_time: estimatedArrival.time || ticket.arrival_time,
+            duration_minutes: estimatedDuration || ticket.duration_minutes,
+          };
+        }));
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : 'Could not load ticket options.');
+          setLoading(false);
+        }
       }
-      const { data: stationData, error: stationError } = await supabase
-        .from('stations')
-        .select('id, code, name, area, latitude, longitude')
-        .in('name', [from, to]);
-      if (stationError) {
-        setError(stationError.message);
-        setLoading(false);
-        return;
-      }
-      const foundStations = (stationData ?? []) as Station[];
-      const origin = foundStations.find((station) => station.name === from);
-      const destination = foundStations.find((station) => station.name === to);
-      if (!origin || !destination) {
-        setError('One or both selected stations are not available.');
-        setLoading(false);
-        return;
-      }
-      setStationIds({ origin: origin.id, destination: destination.id });
-      const optionsResult = await getTicketOptions({
-        originStationId: origin.id,
-        destinationStationId: destination.id,
-        earliestTime: startTime || null,
-        travelDate: date,
-      });
-      setLoading(false);
-      if (optionsResult.error) {
-        setError(optionsResult.error);
-        return;
-      }
-      setError('');
-      setHasLiveSeatInventory(optionsResult.hasLiveSeatInventory);
-      setTicketOptions(optionsResult.data.map((ticket) => {
-        const estimatedDuration = estimateJourneyMinutes(from, to, ticket.duration_minutes);
-        const estimatedArrival = estimateArrivalTime(ticket.departure_time, estimatedDuration);
-        return {
-          ...ticket,
-          arrival_time: estimatedArrival.time || ticket.arrival_time,
-          duration_minutes: estimatedDuration || ticket.duration_minutes,
-        };
-      }));
     };
     void loadOptions();
+
+    return () => {
+      cancelled = true;
+    };
   }, [date, from, refreshNonce, startTime, to]);
 
   const reserveTicket = async (ticket: TicketOption) => {

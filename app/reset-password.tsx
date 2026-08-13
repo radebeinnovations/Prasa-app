@@ -29,15 +29,20 @@ export default function ResetPassword() {
     }
     setError('');
     setLoading(true);
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo: passwordResetRedirectUrl });
-    setLoading(false);
-    if (resetError) {
-      setError(supabaseErrorMessage(resetError, 'Password recovery failed.'));
-      return;
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo: passwordResetRedirectUrl });
+      if (resetError) {
+        setError(supabaseErrorMessage(resetError, 'Password recovery failed.'));
+        return;
+      }
+      Alert.alert('Check your email', 'Open the password-reset link on this device to choose a new password.', [
+        { text: 'OK', onPress: () => router.replace('/login') },
+      ]);
+    } catch (resetFailure) {
+      setError(supabaseErrorMessage(resetFailure, 'Password recovery failed.'));
+    } finally {
+      setLoading(false);
     }
-    Alert.alert('Check your email', 'Open the password-reset link on this device to choose a new password.', [
-      { text: 'OK', onPress: () => router.replace('/login') },
-    ]);
   };
 
   const updatePassword = async () => {
@@ -54,16 +59,21 @@ export default function ResetPassword() {
       return;
     }
     setLoading(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-    if (updateError) {
-      setError(updateError.message);
-      return;
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) {
+        setError(supabaseErrorMessage(updateError, 'Password update failed.'));
+        return;
+      }
+      clearPasswordRecovery();
+      Alert.alert('Password updated', 'Your new password is ready to use.', [
+        { text: 'Continue', onPress: () => router.replace('/home') },
+      ]);
+    } catch (updateFailure) {
+      setError(supabaseErrorMessage(updateFailure, 'Password update failed.'));
+    } finally {
+      setLoading(false);
     }
-    clearPasswordRecovery();
-    Alert.alert('Password updated', 'Your new password is ready to use.', [
-      { text: 'Continue', onPress: () => router.replace('/home') },
-    ]);
   };
 
   return (
