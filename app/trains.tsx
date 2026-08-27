@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,11 +18,47 @@ export default function Trains() {
   const [to, setTo] = useState<RouteStation>(routeStations[6]);
   const [selectedStation, setSelectedStation] = useState<RouteStation | null>(routeStations[0]);
   const [editingEndpoint, setEditingEndpoint] = useState<EditingEndpoint>('from');
+  const [pickerEndpoint, setPickerEndpoint] = useState<EditingEndpoint | null>(null);
+  const [stationQuery, setStationQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const routeStationNames = new Set(stationsBetween(from.code, to.code).map((station) => station.name));
   const visibleTrains = trains.filter((train) => routeStationNames.has(train.station));
+  const filteredStations = routeStations.filter((station) => (
+    `${station.name} ${station.area}`.toLocaleLowerCase().includes(stationQuery.trim().toLocaleLowerCase())
+  ));
+
+  const openStationPicker = (endpoint: EditingEndpoint) => {
+    setEditingEndpoint(endpoint);
+    setStationQuery('');
+    setPickerEndpoint(endpoint);
+  };
+
+  const closeStationPicker = () => {
+    setPickerEndpoint(null);
+    setStationQuery('');
+  };
+
+  const selectStationFromPicker = (station: RouteStation) => {
+    if (!pickerEndpoint) return;
+    if (station.code === (pickerEndpoint === 'from' ? to.code : from.code)) return;
+    setSelectedStation(station);
+    if (pickerEndpoint === 'from') {
+      setFrom(station);
+      setEditingEndpoint('to');
+    } else {
+      setTo(station);
+      setEditingEndpoint('to');
+    }
+    closeStationPicker();
+  };
+
+  const swapEndpoints = () => {
+    setFrom(to);
+    setTo(from);
+    setEditingEndpoint((endpoint) => endpoint === 'from' ? 'to' : 'from');
+  };
 
   const selectMapStation = (station: RouteStation) => {
     setSelectedStation(station);
@@ -121,7 +157,7 @@ export default function Trains() {
           <TouchableOpacity
             accessibilityLabel={`Change departure station, currently ${from.name}`}
             accessibilityRole="button"
-            onPress={() => setEditingEndpoint('from')}
+            onPress={() => openStationPicker('from')}
             style={[styles.routeRow, editingEndpoint === 'from' && styles.routeRowActive]}
           >
             <View style={[styles.endpointDot, styles.fromDot]} />
@@ -132,11 +168,21 @@ export default function Trains() {
             </View>
             <Ionicons name="locate-outline" size={20} color="#0785C5" />
           </TouchableOpacity>
-          <View style={styles.routeDivider} />
+          <View style={styles.routeDividerWithSwap}>
+            <View style={styles.routeDivider} />
+            <TouchableOpacity
+              accessibilityLabel="Swap departure and destination stations"
+              accessibilityRole="button"
+              onPress={swapEndpoints}
+              style={styles.swapButton}
+            >
+              <Ionicons name="swap-vertical" size={20} color="#0785C5" />
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity
             accessibilityLabel={`Change destination station, currently ${to.name}`}
             accessibilityRole="button"
-            onPress={() => setEditingEndpoint('to')}
+            onPress={() => openStationPicker('to')}
             style={[styles.routeRow, editingEndpoint === 'to' && styles.routeRowActive]}
           >
             <View style={[styles.endpointDot, styles.toDot]} />
@@ -196,6 +242,63 @@ export default function Trains() {
           })}
         </ScrollView>
       </SafeAreaView>
+
+      <Modal animationType="slide" transparent visible={pickerEndpoint !== null} onRequestClose={closeStationPicker}>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity accessibilityLabel="Close station selector" onPress={closeStationPicker} style={styles.modalDismissArea} />
+          <SafeAreaView edges={['bottom']} style={styles.stationPicker}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.pickerHeader}>
+              <View>
+                <Text style={styles.pickerTitle}>Select {pickerEndpoint === 'from' ? 'departure' : 'destination'}</Text>
+                <Text style={styles.pickerSubtitle}>Search by station or area</Text>
+              </View>
+              <TouchableOpacity accessibilityLabel="Close station selector" accessibilityRole="button" onPress={closeStationPicker} style={styles.closeButton}>
+                <Ionicons name="close" size={22} color="#4B5563" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.searchField}>
+              <Ionicons name="search" size={20} color="#667085" />
+              <TextInput
+                accessibilityLabel="Search stations"
+                autoCorrect={false}
+                autoFocus
+                onChangeText={setStationQuery}
+                placeholder="Search stations"
+                placeholderTextColor="#7A848A"
+                style={styles.searchInput}
+                value={stationQuery}
+              />
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={styles.stationList}>
+              {filteredStations.map((station) => {
+                const isFrom = station.code === from.code;
+                const isTo = station.code === to.code;
+                const unavailable = station.code === (pickerEndpoint === 'from' ? to.code : from.code);
+                return (
+                  <TouchableOpacity
+                    accessibilityLabel={`${station.name}, ${station.area}${unavailable ? ', unavailable' : ''}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: unavailable }}
+                    disabled={unavailable}
+                    key={station.code}
+                    onPress={() => selectStationFromPicker(station)}
+                    style={[styles.stationOption, unavailable && styles.stationOptionDisabled]}
+                  >
+                    <View style={styles.stationOptionText}>
+                      <Text style={styles.stationOptionName}>{station.name}</Text>
+                      <Text style={styles.stationOptionArea}>{station.area}</Text>
+                    </View>
+                    {isFrom ? <View style={[styles.stationBadge, styles.fromBadge]}><Text style={styles.stationBadgeText}>FROM</Text></View> : null}
+                    {isTo ? <View style={[styles.stationBadge, styles.toBadge]}><Text style={styles.stationBadgeText}>TO</Text></View> : null}
+                  </TouchableOpacity>
+                );
+              })}
+              {filteredStations.length === 0 ? <Text style={styles.noResults}>No stations match your search.</Text> : null}
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -212,7 +315,9 @@ const styles = StyleSheet.create({
   routeContainer: { backgroundColor: '#F3F5F6', borderRadius: 12, padding: 5, marginHorizontal: 20, marginBottom: 8 },
   routeRow: { flexDirection: 'row', alignItems: 'center', minHeight: 43, paddingHorizontal: 9, borderRadius: 8 },
   routeRowActive: { backgroundColor: '#FFFFFF', shadowColor: '#0A3348', shadowOpacity: 0.08, shadowRadius: 4, elevation: 1 },
-  routeDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#C8CDD0', marginLeft: 76, marginRight: 10 },
+  routeDividerWithSwap: { height: 10, justifyContent: 'center', marginLeft: 76, marginRight: 10 },
+  routeDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#C8CDD0' },
+  swapButton: { position: 'absolute', right: 0, width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#BBDDEC', alignItems: 'center', justifyContent: 'center' },
   endpointDot: { width: 9, height: 9, borderRadius: 5, marginRight: 9 },
   fromDot: { backgroundColor: '#138A36' },
   toDot: { backgroundColor: '#D33232' },
@@ -241,4 +346,24 @@ const styles = StyleSheet.create({
   statusDot: { width: 7, height: 7, borderRadius: 4, marginRight: 6 },
   arrivalText: { fontSize: 13, lineHeight: 17, fontWeight: '600' },
   emptyText: { textAlign: 'center', color: '#64748B', marginVertical: 24 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.38)', justifyContent: 'flex-end' },
+  modalDismissArea: { flex: 1 },
+  stationPicker: { maxHeight: '78%', minHeight: 420, backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 10 },
+  pickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 14 },
+  pickerTitle: { color: '#202020', fontSize: 19, fontWeight: '800' },
+  pickerSubtitle: { color: '#667085', fontSize: 13, marginTop: 3 },
+  closeButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#F2F4F5', alignItems: 'center', justifyContent: 'center' },
+  searchField: { height: 50, flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 8, borderRadius: 10, backgroundColor: '#F2F4F5', paddingHorizontal: 13 },
+  searchInput: { flex: 1, color: '#202020', fontSize: 16, marginLeft: 9, height: '100%' },
+  stationList: { paddingHorizontal: 20 },
+  stationOption: { minHeight: 62, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E6E9EB' },
+  stationOptionDisabled: { opacity: 0.42 },
+  stationOptionText: { flex: 1 },
+  stationOptionName: { color: '#202020', fontSize: 16, fontWeight: '700' },
+  stationOptionArea: { color: '#6B7280', fontSize: 13, marginTop: 3 },
+  stationBadge: { borderRadius: 5, paddingHorizontal: 7, paddingVertical: 4 },
+  fromBadge: { backgroundColor: '#138A36' },
+  toBadge: { backgroundColor: '#D33232' },
+  stationBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
+  noResults: { color: '#64748B', textAlign: 'center', marginTop: 32 },
 });

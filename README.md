@@ -2,6 +2,10 @@
 
 Mobile ticketing and passenger-information prototype for the Passenger Rail Agency of South Africa (PRASA), built with Expo Router and Expo SDK 54.
 
+## Live Demo
+
+**[View the Live Web App on Vercel](https://prasa-app.vercel.app)** *(Update this link if your Vercel project name is different)*
+
 ## Run with Expo Go
 
 Requirements:
