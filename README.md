@@ -4,7 +4,7 @@ Mobile ticketing and passenger-information prototype for the Passenger Rail Agen
 
 ## Live Demo
 
-**[View the Live Web App on Vercel](https://prasa-app.vercel.app)** *(Update this link if your Vercel project name is different)*
+**[View the Live Web App on Vercel](https://prasa-app-one.vercel.app/home)**
 
 ## Run with Expo Go
 
