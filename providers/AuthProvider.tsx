@@ -5,21 +5,28 @@ import type { Session, User } from '@supabase/supabase-js';
 import { completeAuthFromUrl } from '../lib/auth-links';
 import { supabase } from '../lib/supabase';
 import type { Profile } from '../lib/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const demoSessionKey = 'prasa-demo-session';
 
 type AuthContextValue = {
   session: Session | null;
+  demoSession: boolean;
   user: User | null;
   profile: Profile | null;
   loading: boolean;
   passwordRecovery: boolean;
   clearPasswordRecovery: () => void;
   refreshProfile: () => Promise<void>;
+  startDemoSession: () => Promise<void>;
+  endDemoSession: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
+  const [demoSession, setDemoSession] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
@@ -50,6 +57,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
       .finally(() => {
         if (mounted) setLoading(false);
       });
+
+    AsyncStorage.getItem(demoSessionKey).then((value) => {
+      if (mounted && value === 'true') setDemoSession(true);
+    });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
@@ -88,13 +99,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<AuthContextValue>(() => ({
     session,
+    demoSession,
     user: session?.user ?? null,
     profile,
     loading,
     passwordRecovery,
     clearPasswordRecovery: () => setPasswordRecovery(false),
     refreshProfile,
-  }), [session, profile, loading, passwordRecovery]);
+    startDemoSession: async () => { await AsyncStorage.setItem(demoSessionKey, 'true'); setDemoSession(true); },
+    endDemoSession: async () => { await AsyncStorage.removeItem(demoSessionKey); setDemoSession(false); },
+  }), [session, demoSession, profile, loading, passwordRecovery]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

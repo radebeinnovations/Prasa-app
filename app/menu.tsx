@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../providers/AuthProvider';
 
 type MenuRoute = '/home' | '/trains' | '/tickets' | '/schedule' | '/parcels' | '/stations' | '/notifications';
 
@@ -18,6 +19,7 @@ const menuItems: { icon: keyof typeof Ionicons.glyphMap; label: string; route: M
 
 export default function Menu() {
   const router = useRouter();
+  const { demoSession, endDemoSession } = useAuth();
 
   const logOut = () => {
     Alert.alert('Log out?', 'You will return to the login screen.', [
@@ -26,6 +28,12 @@ export default function Menu() {
         text: 'Log out',
         style: 'destructive',
         onPress: async () => {
+          if (demoSession) {
+            await endDemoSession();
+            router.dismissAll();
+            router.replace('/login');
+            return;
+          }
           const { error } = await supabase.auth.signOut();
           if (error) {
             Alert.alert('Could not log out', error.message);

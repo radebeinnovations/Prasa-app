@@ -8,7 +8,7 @@ import { AuthProvider, useAuth } from '../providers/AuthProvider';
 const publicRoutes = new Set(['index', 'onboarding', 'onboarding2', 'login', 'signup', 'reset-password', 'auth']);
 
 function AppNavigator() {
-  const { session, loading, passwordRecovery } = useAuth();
+  const { session, demoSession, loading, passwordRecovery } = useAuth();
   const router = useRouter();
   const segments = useSegments();
 
@@ -19,14 +19,14 @@ function AppNavigator() {
       router.replace('/reset-password');
       return;
     }
-    if (!session && !publicRoutes.has(rootRoute)) {
+    if (!session && !demoSession && !publicRoutes.has(rootRoute)) {
       router.replace('/login');
       return;
     }
-    if (session && ['index', 'onboarding', 'onboarding2', 'login', 'signup', 'auth'].includes(rootRoute)) {
+    if ((session || demoSession) && ['index', 'onboarding', 'onboarding2', 'login', 'signup', 'auth'].includes(rootRoute)) {
       router.replace('/home');
     }
-  }, [loading, passwordRecovery, router, segments, session]);
+  }, [demoSession, loading, passwordRecovery, router, segments, session]);
 
   if (loading) {
     return <View style={styles.loading}><ActivityIndicator color="#0076CB" size="large" /></View>;

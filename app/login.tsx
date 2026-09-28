@@ -7,9 +7,14 @@ import { PrasaBrand } from '../components/PrasaBrand';
 import { signInWithProvider } from '../lib/auth-links';
 import { supabaseErrorMessage } from '../lib/errors';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../providers/AuthProvider';
+
+const demoEmail = 'mboniradebe88@outlook.com';
+const demoPassword = '123456789';
 
 export default function Login() {
   const router = useRouter();
+  const { startDemoSession } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -24,6 +29,12 @@ export default function Login() {
     }
     setError('');
     setLoading(true);
+    if (cleanEmail === demoEmail && password === demoPassword) {
+      await startDemoSession();
+      setLoading(false);
+      router.replace('/home');
+      return;
+    }
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
       if (signInError) setError(supabaseErrorMessage(signInError, 'Login failed.'));
